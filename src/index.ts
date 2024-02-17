@@ -5,6 +5,9 @@ import { generate } from "./utils";
 import path from "path";
 import { getAllFiles } from "./file";
 import { uploadFile } from "./aws";
+import { createClient } from "redis";
+const publisher = createClient();
+publisher.connect();
 
 const app = express();
 app.use(cors());
@@ -15,9 +18,12 @@ app.post("/deploy", async (req, res) => {
   await simpleGit().clone(repoUrl, path.join(__dirname, `output/${id}`));
   const files = getAllFiles(path.join(__dirname, `output/${id}`));
 
+  // Upload files to S3
   files.forEach(async (file) => {
     await uploadFile(file.slice(__dirname.length + 8), file);
   });
+
+  publisher.lPush("build-queue", id);
   res.json({ id: id });
 });
 
